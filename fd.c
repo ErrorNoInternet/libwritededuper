@@ -1,21 +1,41 @@
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "fcntl.h"
+#include "hashmap.h"
+#include <dirent.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-char *fd_path_cache;
+struct hashmap *working_fds;
 
-char *fd_path(int fd) {
-    char *path = &fd_path_cache[fd];
-    if (path[0] != 0)
-        return path;
+typedef struct {
+    char *path;
+    int fd;
+} WorkingFd;
 
-    char fd_path[4096] = {0};
-    sprintf(fd_path, "/proc/self/fd/%d", fd);
-    if (!readlink(fd_path, &fd_path_cache[fd], 4095)) {
-        fprintf(stderr, "couldn't readlink on file descriptor %d: errno %d\n",
-                fd, errno);
-        exit(EXIT_FAILURE);
-    };
-    return &fd_path_cache[fd];
+uint64_t working_fd_hash(const void *item, uint64_t seed0, uint64_t seed1) {
+    const WorkingFd *working_fd = item;
+    return hashmap_sip(working_fd->path, strlen(working_fd->path), seed0,
+                       seed1);
+}
+
+int working_fd_compare(const void *a, const void *b, void *data) {
+    const WorkingFd *aa = a;
+    const WorkingFd *bb = b;
+    return strcmp(aa->path, bb->path);
+}
+
+int get_working_fd(char *path) {
+    const WorkingFd *working_fd =
+        hashmap_get(working_fds, &(WorkingFd){.path = path});
+
+    if (!working_fd) {
+        int fd = open(path, O_RDWR);
+        if (fd < 0)
+            return fd;
+        working_fd = &(WorkingFd){.path = path, .fd = fd};
+        hashmap_set(working_fds, working_fd);
+    }
+
+    return working_fd->fd;
 }

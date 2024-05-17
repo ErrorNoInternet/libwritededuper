@@ -3,7 +3,6 @@
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +15,7 @@
 #include "crc32.c"
 #include "fd.c"
 #include "hash.c"
+#include "hashmap.c"
 
 #define BLOCK_SIZE 4096
 
@@ -28,7 +28,8 @@ void __attribute__((constructor)) writedupe_init(void) {
         exit(EXIT_FAILURE);
     }
 
-    fd_path_cache = malloc(INT_MAX);
+    working_fds = hashmap_new(sizeof(WorkingFd), 0, 0, 0, working_fd_hash,
+                              working_fd_compare, NULL, NULL);
 
     libc_open = dlsym(RTLD_NEXT, "open");
     if (!libc_open || dlerror()) {
@@ -44,18 +45,19 @@ void __attribute__((constructor)) writedupe_init(void) {
 }
 
 ssize_t write(int fd, const void *buf, size_t len) {
-    struct stat statbuf;
-    if (fstat(fd, &statbuf) == -1) {
-        fprintf(stderr, "couldn't fstat file descriptor %d: errno %d\n", fd,
-                errno);
-        exit(EXIT_FAILURE);
-    }
-    off_t position = statbuf.st_size;
+    off_t position = lseek(fd, 0, SEEK_CUR);
 
     if (len < BLOCK_SIZE || len % BLOCK_SIZE != 0 || position % BLOCK_SIZE != 0)
         return (*libc_write)(fd, buf, len);
 
-    char *path = fd_path(fd);
+    char path[4096] = {0};
+    char fd_link[4096] = {0};
+    sprintf(fd_link, "/proc/self/fd/%d", fd);
+    if (!readlink(fd_link, path, 4095)) {
+        fprintf(stderr, "couldn't readlink on file descriptor %d: errno %d\n",
+                fd, errno);
+        exit(EXIT_FAILURE);
+    };
 
     HashEntry *hash_entry;
     ssize_t just_written;
@@ -67,6 +69,7 @@ ssize_t write(int fd, const void *buf, size_t len) {
         uint32_t hash = calculate_crc32c(0, sbuf, BLOCK_SIZE);
 
         if ((hash_entry = hash_table[hash]) == NULL) {
+        new_block:
             hash_entry = malloc(sizeof(HashEntry));
             strcpy(hash_entry->path, path);
             hash_entry->offset = position / BLOCK_SIZE;
@@ -77,18 +80,22 @@ ssize_t write(int fd, const void *buf, size_t len) {
                         "couldn't write to file descriptor %d: errno "
                         "%d\n",
                         fd, errno);
-                exit(EXIT_FAILURE);
+                return -1;
             };
             position += BLOCK_SIZE;
         } else {
+            int in_fd = get_working_fd(hash_entry->path);
+            if (in_fd < 0)
+                goto new_block;
             off_t in_position = hash_entry->offset * BLOCK_SIZE;
-            if ((just_written = copy_file_range(fd, &in_position, fd, &position,
-                                                BLOCK_SIZE, 0)) < 0) {
+
+            if ((just_written = copy_file_range(
+                     in_fd, &in_position, fd, &position, BLOCK_SIZE, 0)) < 0) {
                 fprintf(stderr,
                         "couldn't copy_file_range on file descriptor %d: errno "
                         "%d\n",
                         fd, errno);
-                exit(EXIT_FAILURE);
+                return -1;
             }
         }
         written += just_written;
