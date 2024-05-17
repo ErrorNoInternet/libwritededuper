@@ -14,8 +14,8 @@
 
 #include "crc32.c"
 #include "fd.c"
-#include "hash.c"
 #include "hashmap.c"
+#include "hashtable.c"
 
 #define BLOCK_SIZE 4096
 
@@ -27,7 +27,7 @@ enum WriteType {
     PWRITE,
 };
 
-void __attribute__((constructor)) writedduper_init(void) {
+void __attribute__((constructor)) libwritedduper_init(void) {
     if ((hash_table = malloc(sizeof(HashEntry *) * pow(2, 32))) == NULL) {
         fprintf(stderr, "couldn't allocate memory: errno %d\n", errno);
         exit(EXIT_FAILURE);
