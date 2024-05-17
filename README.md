@@ -1,4 +1,4 @@
-# libwritedduper
+# libwritededuper
 
 In-band deduplication via LD_PRELOAD for any filesystem that supports reflinks!
 
