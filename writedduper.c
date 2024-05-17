@@ -50,7 +50,7 @@ void __attribute__((constructor)) writedduper_init(void) {
 }
 
 ssize_t handle_fallback_write(enum WriteType type, int fd, const void *buf,
-                       size_t count, off_t offset) {
+                              size_t count, off_t offset) {
     if (type == WRITE) {
         return (*libc_write)(fd, buf, count);
     } else if (type == PWRITE) {
@@ -84,19 +84,20 @@ ssize_t handle_write(enum WriteType type, int fd, const void *buf, size_t count,
     ssize_t written, total_written = 0;
     unsigned char block_buf[BLOCK_SIZE];
 
-    for (int block_offset = 0; block_offset < count; block_offset += BLOCK_SIZE) {
+    for (int block_offset = 0; block_offset < count;
+         block_offset += BLOCK_SIZE) {
         memcpy(block_buf, &buf[block_offset], BLOCK_SIZE);
         uint32_t hash = calculate_crc32c(0, block_buf, BLOCK_SIZE);
 
         if ((hash_entry = hash_table[hash]) == NULL) {
-        new_block:
+        fallback_write:
             hash_entry = malloc(sizeof(HashEntry));
             strcpy(hash_entry->path, path);
             hash_entry->offset = offset / BLOCK_SIZE;
             hash_table[hash] = hash_entry;
 
-            if ((written =
-                     handle_fallback_write(type, fd, block_buf, BLOCK_SIZE, offset)) < 0) {
+            if ((written = handle_fallback_write(type, fd, block_buf,
+                                                 BLOCK_SIZE, offset)) < 0) {
                 fprintf(stderr,
                         "couldn't write to file descriptor %d: errno "
                         "%d\n",
@@ -107,10 +108,17 @@ ssize_t handle_write(enum WriteType type, int fd, const void *buf, size_t count,
         } else {
             int in_fd = get_working_fd(hash_entry->path);
             if (in_fd < 0)
-                goto new_block;
-            off_t in_position = hash_entry->offset * BLOCK_SIZE;
+                goto fallback_write;
 
-            if ((written = copy_file_range(in_fd, &in_position, fd, &offset,
+            off_t in_offset = hash_entry->offset * BLOCK_SIZE;
+
+            unsigned char in_buf[BLOCK_SIZE];
+            if (pread(in_fd, in_buf, BLOCK_SIZE, in_offset) < BLOCK_SIZE)
+                goto fallback_write;
+            if (memcmp(block_buf, in_buf, BLOCK_SIZE) != 0)
+                goto fallback_write;
+
+            if ((written = copy_file_range(in_fd, &in_offset, fd, &offset,
                                            BLOCK_SIZE, 0)) < 0) {
                 fprintf(stderr,
                         "couldn't copy_file_range on file descriptor %d: errno "
