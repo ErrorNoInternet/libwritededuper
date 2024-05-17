@@ -126,6 +126,13 @@ ssize_t handle_write(enum WriteType type, int fd, const void *buf, size_t count,
                         fd, errno);
                 return -1;
             }
+            if (lseek(fd, written, SEEK_CUR) == -1) {
+                fprintf(stderr,
+                        "couldn't lseek %ld bytes on file descriptor %d: errno "
+                        "%d\n",
+                        written, fd, errno);
+                return -1;
+            };
         }
         total_written += written;
     };
