@@ -22,7 +22,7 @@
 static int (*libc_open)(const char *, int, ...);
 static int (*libc_write)(int fd, const void *buf, size_t count);
 
-void __attribute__((constructor)) writedupe_init(void) {
+void __attribute__((constructor)) writedduper_init(void) {
     if ((hash_table = malloc(sizeof(HashEntry *) * pow(2, 32))) == NULL) {
         fprintf(stderr, "couldn't allocate memory: errno %d\n", errno);
         exit(EXIT_FAILURE);
