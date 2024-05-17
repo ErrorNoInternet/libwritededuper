@@ -45,8 +45,10 @@ void __attribute__((constructor)) writedduper_init(void) {
 }
 
 ssize_t write(int fd, const void *buf, size_t len) {
-    off_t position = lseek(fd, 0, SEEK_CUR);
+    if ((fcntl(fd, F_GETFL) & O_APPEND) == O_APPEND)
+        return (*libc_write)(fd, buf, len);
 
+    off_t position = lseek(fd, 0, SEEK_CUR);
     if (len < BLOCK_SIZE || len % BLOCK_SIZE != 0 || position % BLOCK_SIZE != 0)
         return (*libc_write)(fd, buf, len);
 
