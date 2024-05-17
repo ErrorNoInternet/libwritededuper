@@ -53,18 +53,17 @@ ssize_t write(int fd, const void *buf, size_t len) {
         return (*libc_write)(fd, buf, len);
 
     char path[4096] = {0};
-    char fd_link[4096] = {0};
+    char fd_link[4096];
     sprintf(fd_link, "/proc/self/fd/%d", fd);
     if (!readlink(fd_link, path, 4095)) {
         fprintf(stderr, "couldn't readlink on file descriptor %d: errno %d\n",
                 fd, errno);
-        exit(EXIT_FAILURE);
+        return (*libc_write)(fd, buf, len);
     };
 
     HashEntry *hash_entry;
-    ssize_t just_written;
-    ssize_t written = 0;
-    unsigned char sbuf[BLOCK_SIZE] = {0};
+    ssize_t written, total_written = 0;
+    unsigned char sbuf[BLOCK_SIZE];
 
     for (int offset = 0; offset < len; offset += BLOCK_SIZE) {
         memcpy(sbuf, &buf[offset], BLOCK_SIZE);
@@ -77,7 +76,7 @@ ssize_t write(int fd, const void *buf, size_t len) {
             hash_entry->offset = position / BLOCK_SIZE;
             hash_table[hash] = hash_entry;
 
-            if ((just_written = (*libc_write)(fd, sbuf, BLOCK_SIZE)) < 0) {
+            if ((written = (*libc_write)(fd, sbuf, BLOCK_SIZE)) < 0) {
                 fprintf(stderr,
                         "couldn't write to file descriptor %d: errno "
                         "%d\n",
@@ -91,8 +90,8 @@ ssize_t write(int fd, const void *buf, size_t len) {
                 goto new_block;
             off_t in_position = hash_entry->offset * BLOCK_SIZE;
 
-            if ((just_written = copy_file_range(
-                     in_fd, &in_position, fd, &position, BLOCK_SIZE, 0)) < 0) {
+            if ((written = copy_file_range(in_fd, &in_position, fd, &position,
+                                           BLOCK_SIZE, 0)) < 0) {
                 fprintf(stderr,
                         "couldn't copy_file_range on file descriptor %d: errno "
                         "%d\n",
@@ -100,8 +99,8 @@ ssize_t write(int fd, const void *buf, size_t len) {
                 return -1;
             }
         }
-        written += just_written;
+        total_written += written;
     };
 
-    return written;
+    return total_written;
 }
