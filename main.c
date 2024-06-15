@@ -39,13 +39,14 @@ enum Operation {
 };
 
 void __attribute__((constructor)) libwritededuper_init(void) {
-    if ((hash_table = malloc(sizeof(HashEntry *) * pow(2, 32))) == NULL) {
+    if ((hash_table = malloc(sizeof(struct HashEntry *) * pow(2, 32))) ==
+        NULL) {
         fprintf(stderr, "couldn't allocate memory: errno %d\n", errno);
         exit(EXIT_FAILURE);
     }
 
-    working_fds = hashmap_new(sizeof(WorkingFd), 0, 0, 0, working_fd_hash,
-                              working_fd_compare, NULL, NULL);
+    working_fds = hashmap_new(sizeof(struct WorkingFd), 0, 0, 0,
+                              working_fd_hash, working_fd_compare, NULL, NULL);
 
     RESOLVE_SYMBOL(write);
     RESOLVE_SYMBOL(pwrite);
@@ -83,7 +84,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
         return handle_fallback_write(type, fd, buf, count, offset);
     };
 
-    HashEntry *hash_entry;
+    struct HashEntry *hash_entry;
     ssize_t written, total_written = 0;
     unsigned char block_buf[BLOCK_SIZE];
 
@@ -94,7 +95,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
 
         if ((hash_entry = hash_table[hash]) == NULL) {
         fallback_write:
-            hash_entry = malloc(sizeof(HashEntry));
+            hash_entry = malloc(sizeof(struct HashEntry));
             strcpy(hash_entry->path, path);
             hash_entry->offset = offset / BLOCK_SIZE;
             hash_table[hash] = hash_entry;
@@ -172,7 +173,7 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
 
     count = handle_fallback_read(type, fd, buf, count, offset);
 
-    HashEntry *hash_entry;
+    struct HashEntry *hash_entry;
     unsigned char block_buf[BLOCK_SIZE];
 
     for (ssize_t block_offset = 0; (block_offset + BLOCK_SIZE) <= count;
@@ -180,7 +181,7 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
         memcpy(block_buf, &buf[block_offset], BLOCK_SIZE);
         uint32_t hash = calculate_crc32c(0, block_buf, BLOCK_SIZE);
 
-        hash_entry = malloc(sizeof(HashEntry));
+        hash_entry = malloc(sizeof(struct HashEntry));
         strcpy(hash_entry->path, path);
         hash_entry->offset = offset / BLOCK_SIZE;
         hash_table[hash] = hash_entry;
