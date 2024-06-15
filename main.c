@@ -63,8 +63,8 @@ ssize_t handle_fallback_write(enum Operation type, int fd, const void *buf,
     return -1;
 }
 
-ssize_t handle_write(enum Operation type, int fd, const void *buf, size_t count,
-                     off_t offset) {
+ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
+                     size_t count, off_t offset) {
     if ((fcntl(fd, F_GETFL) & O_APPEND) == O_APPEND)
         return handle_fallback_write(type, fd, buf, count, offset);
 
@@ -153,8 +153,8 @@ ssize_t handle_fallback_read(enum Operation type, int fd, void *buf,
     return -1;
 }
 
-ssize_t handle_read(enum Operation type, int fd, void *buf, size_t count,
-                    off_t offset) {
+ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
+                    size_t count, off_t offset) {
     if (type == READ)
         offset = lseek(fd, 0, SEEK_CUR);
 
