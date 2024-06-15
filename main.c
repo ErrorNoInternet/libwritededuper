@@ -124,11 +124,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
 
             if ((written = copy_file_range(in_fd, &in_offset, fd, &offset,
                                            BLOCK_SIZE, 0)) < 0) {
-                fprintf(stderr,
-                        "couldn't copy_file_range on file descriptor %d: errno "
-                        "%d\n",
-                        fd, errno);
-                return -1;
+                goto fallback_write;
             }
             if (lseek(fd, written, SEEK_CUR) == -1) {
                 fprintf(stderr,
