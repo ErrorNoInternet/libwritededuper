@@ -98,7 +98,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
         fallback_write:
             hash_entry = malloc(sizeof(struct HashEntry));
             strcpy(hash_entry->path, path);
-            hash_entry->offset = offset / BLOCK_SIZE;
+            hash_entry->offset = offset;
             hash_table[hash] = hash_entry;
 
             if ((written = handle_fallback_write(type, fd, block_buf,
@@ -115,7 +115,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
             if (in_fd < 0)
                 goto fallback_write;
 
-            off_t in_offset = hash_entry->offset * BLOCK_SIZE;
+            off_t in_offset = hash_entry->offset;
 
             unsigned char in_buf[BLOCK_SIZE];
             if ((libc_pread)(in_fd, in_buf, BLOCK_SIZE, in_offset) < BLOCK_SIZE)
@@ -182,7 +182,7 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
 
         hash_entry = malloc(sizeof(struct HashEntry));
         strcpy(hash_entry->path, path);
-        hash_entry->offset = offset / BLOCK_SIZE;
+        hash_entry->offset = offset;
         hash_table[hash] = hash_entry;
 
         offset += BLOCK_SIZE;
