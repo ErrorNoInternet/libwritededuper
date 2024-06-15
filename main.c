@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 
 #include <dlfcn.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
@@ -27,7 +26,7 @@ static int (*libc_pread)(int fd, void *buf, size_t count, off_t offset);
 #define RESOLVE_SYMBOL(name)                                                   \
     libc_##name = dlsym(RTLD_NEXT, #name);                                     \
     if (!libc_##name || dlerror()) {                                           \
-        fprintf(stderr, "undeclared symbol `" #name "`\n");                    \
+        fprintf(stderr, "libwritededuper: undeclared symbol `" #name "`\n");   \
         exit(EXIT_FAILURE);                                                    \
     };
 
@@ -41,7 +40,7 @@ enum Operation {
 void __attribute__((constructor)) libwritededuper_init(void) {
     if ((hash_table = malloc(sizeof(struct HashEntry *) * pow(2, 32))) ==
         NULL) {
-        fprintf(stderr, "couldn't allocate memory: errno %d\n", errno);
+        fprintf(stderr, "libwritededuper: couldn't allocate memory: %m\n");
         exit(EXIT_FAILURE);
     }
 
@@ -79,8 +78,10 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
     char fd_link[4096] = {0};
     sprintf(fd_link, "/proc/self/fd/%d", fd);
     if (!readlink(fd_link, path, 4095)) {
-        fprintf(stderr, "couldn't readlink on file descriptor %d: errno %d\n",
-                fd, errno);
+        fprintf(
+            stderr,
+            "libwritededuper: couldn't readlink on file descriptor %d: %m\n",
+            fd);
         return handle_fallback_write(type, fd, buf, count, offset);
     };
 
@@ -103,9 +104,9 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
             if ((written = handle_fallback_write(type, fd, block_buf,
                                                  BLOCK_SIZE, offset)) < 0) {
                 fprintf(stderr,
-                        "couldn't write to file descriptor %d: errno "
-                        "%d\n",
-                        fd, errno);
+                        "libwritededuper: couldn't write to file descriptor "
+                        "%d: %m\n",
+                        fd);
                 return -1;
             };
             offset += BLOCK_SIZE;
@@ -128,9 +129,9 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
             }
             if (lseek(fd, written, SEEK_CUR) == -1) {
                 fprintf(stderr,
-                        "couldn't lseek %ld bytes on file descriptor %d: errno "
-                        "%d\n",
-                        written, fd, errno);
+                        "libwritededuper: couldn't lseek %ld bytes on file "
+                        "descriptor %d: %m\n",
+                        written, fd);
                 return -1;
             };
         }
@@ -162,8 +163,10 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
     char fd_link[4096] = {0};
     sprintf(fd_link, "/proc/self/fd/%d", fd);
     if (!readlink(fd_link, path, 4095)) {
-        fprintf(stderr, "couldn't readlink on file descriptor %d: errno %d\n",
-                fd, errno);
+        fprintf(
+            stderr,
+            "libwritededuper: couldn't readlink on file descriptor %d: %m\n",
+            fd);
         return handle_fallback_read(type, fd, buf, count, offset);
     };
 
