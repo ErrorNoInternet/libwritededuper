@@ -172,12 +172,14 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
         return handle_fallback_read(type, fd, buf, count, offset);
     };
 
-    count = handle_fallback_read(type, fd, buf, count, offset);
+    ssize_t s_count;
+    if ((s_count = handle_fallback_read(type, fd, buf, count, offset)) < 0)
+        return s_count;
 
     struct HashEntry *hash_entry;
     unsigned char block_buf[BLOCK_SIZE];
 
-    for (ssize_t block_offset = 0; (block_offset + BLOCK_SIZE) <= count;
+    for (ssize_t block_offset = 0; (block_offset + BLOCK_SIZE) <= s_count;
          block_offset += BLOCK_SIZE) {
         memcpy(block_buf, &buf[block_offset], BLOCK_SIZE);
         uint32_t hash = calculate_crc32c(0, block_buf, BLOCK_SIZE);
@@ -190,7 +192,7 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
         offset += BLOCK_SIZE;
     };
 
-    return count;
+    return s_count;
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
