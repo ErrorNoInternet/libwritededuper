@@ -35,7 +35,7 @@ static int (*libc_pread)(int fd, void *buf, size_t count, off_t offset);
     };
 
 void __attribute__((constructor)) libwritededuper_init(void) {
-    if ((hash_table = malloc(sizeof(struct HashEntry *) * pow(2, 32))) ==
+    if ((hash_table = malloc(sizeof(struct TableEntry *) * pow(2, 32))) ==
         NULL) {
         fprintf(stderr, "libwritededuper: couldn't allocate memory: %m\n");
         exit(EXIT_FAILURE);
@@ -79,7 +79,7 @@ ssize_t handle_write(int type, int fd, const unsigned char *buf, size_t count,
         return handle_fallback_write(type, fd, buf, count, offset);
     };
 
-    struct HashEntry *hash_entry;
+    struct TableEntry *table_entry;
     ssize_t written, total_written = 0;
     unsigned char block_buf[BLOCK_SIZE];
 
@@ -88,7 +88,7 @@ ssize_t handle_write(int type, int fd, const unsigned char *buf, size_t count,
         memcpy(block_buf, &buf[block_offset], BLOCK_SIZE);
         uint32_t hash = calculate_crc32c(0, block_buf, BLOCK_SIZE);
 
-        if ((hash_entry = hash_table[hash]) == NULL) {
+        if ((table_entry = hash_table[hash]) == NULL) {
         fallback_write:
             if ((written = handle_fallback_write(type, fd, block_buf,
                                                  BLOCK_SIZE, offset)) < 0) {
@@ -99,10 +99,10 @@ ssize_t handle_write(int type, int fd, const unsigned char *buf, size_t count,
                 return -1;
             };
 
-            hash_entry = malloc(sizeof(struct HashEntry));
-            strlcpy(hash_entry->path, path, 4096);
-            hash_entry->offset = offset;
-            hash_table[hash] = hash_entry;
+            table_entry = malloc(sizeof(struct TableEntry));
+            strlcpy(table_entry->path, path, 4096);
+            table_entry->offset = offset;
+            hash_table[hash] = table_entry;
 
             offset += BLOCK_SIZE;
         } else {
@@ -110,17 +110,17 @@ ssize_t handle_write(int type, int fd, const unsigned char *buf, size_t count,
                 goto fallback_write;
 
             int in_fd;
-            if ((in_fd = get_working_fd(hash_entry->path)) < 0)
+            if ((in_fd = get_working_fd(table_entry->path)) < 0)
                 goto fallback_write;
 
             unsigned char in_buf[BLOCK_SIZE];
-            if ((*libc_pread)(in_fd, in_buf, BLOCK_SIZE, hash_entry->offset) <
+            if ((*libc_pread)(in_fd, in_buf, BLOCK_SIZE, table_entry->offset) <
                 BLOCK_SIZE)
                 goto fallback_write;
             if (memcmp(block_buf, in_buf, BLOCK_SIZE) != 0)
                 goto fallback_write;
 
-            if ((written = copy_file_range(in_fd, &hash_entry->offset, fd,
+            if ((written = copy_file_range(in_fd, &table_entry->offset, fd,
                                            &offset, BLOCK_SIZE, 0)) < 0) {
                 goto fallback_write;
             }
@@ -169,7 +169,7 @@ ssize_t handle_read(int type, int fd, unsigned char *buf, size_t count,
     if ((s_count = handle_fallback_read(type, fd, buf, count, offset)) < 0)
         return s_count;
 
-    struct HashEntry *hash_entry;
+    struct TableEntry *table_entry;
     unsigned char block_buf[BLOCK_SIZE];
 
     for (ssize_t block_offset = 0; (block_offset + BLOCK_SIZE) <= s_count;
@@ -177,10 +177,10 @@ ssize_t handle_read(int type, int fd, unsigned char *buf, size_t count,
         memcpy(block_buf, &buf[block_offset], BLOCK_SIZE);
         uint32_t hash = calculate_crc32c(0, block_buf, BLOCK_SIZE);
 
-        hash_entry = malloc(sizeof(struct HashEntry));
-        strlcpy(hash_entry->path, path, 4096);
-        hash_entry->offset = offset;
-        hash_table[hash] = hash_entry;
+        table_entry = malloc(sizeof(struct TableEntry));
+        strlcpy(table_entry->path, path, 4096);
+        table_entry->offset = offset;
+        hash_table[hash] = table_entry;
 
         offset += BLOCK_SIZE;
     };

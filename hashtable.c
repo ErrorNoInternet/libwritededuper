@@ -1,8 +1,8 @@
 #include <stdio.h>
 
-struct HashEntry {
+struct TableEntry {
     char path[4096];
     off_t offset;
 };
 
-struct HashEntry **hash_table;
+struct TableEntry **hash_table;
