@@ -119,8 +119,8 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
             if ((fcntl(fd, F_GETFL) & O_APPEND) == O_APPEND)
                 goto fallback_write;
 
-            int in_fd = get_working_fd(hash_entry->path);
-            if (in_fd < 0)
+            int in_fd;
+            if ((in_fd = get_working_fd(hash_entry->path)) < 0)
                 goto fallback_write;
 
             unsigned char in_buf[BLOCK_SIZE];
@@ -134,7 +134,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
                                            &offset, BLOCK_SIZE, 0)) < 0) {
                 goto fallback_write;
             }
-            if (lseek(fd, written, SEEK_CUR) < 0) {
+            if (!lseek(fd, written, SEEK_CUR)) {
                 fprintf(stderr,
                         "libwritededuper: couldn't lseek %ld bytes on file "
                         "descriptor %d: %m\n",
