@@ -65,9 +65,6 @@ ssize_t handle_fallback_write(enum Operation type, int fd, const void *buf,
 
 ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
                      size_t count, off_t offset) {
-    if ((fcntl(fd, F_GETFL) & O_APPEND) == O_APPEND)
-        return handle_fallback_write(type, fd, buf, count, offset);
-
     if (type == WRITE)
         if ((offset = lseek(fd, 0, SEEK_CUR)) < 0)
             return handle_fallback_write(type, fd, buf, count, offset);
@@ -97,11 +94,6 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
 
         if ((hash_entry = hash_table[hash]) == NULL) {
         fallback_write:
-            hash_entry = malloc(sizeof(struct HashEntry));
-            strlcpy(hash_entry->path, path, 4096);
-            hash_entry->offset = offset;
-            hash_table[hash] = hash_entry;
-
             if ((written = handle_fallback_write(type, fd, block_buf,
                                                  BLOCK_SIZE, offset)) < 0) {
                 fprintf(stderr,
@@ -110,22 +102,30 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
                         fd);
                 return -1;
             };
+
+            hash_entry = malloc(sizeof(struct HashEntry));
+            strlcpy(hash_entry->path, path, 4096);
+            hash_entry->offset = offset;
+            hash_table[hash] = hash_entry;
+
             offset += BLOCK_SIZE;
         } else {
+            if ((fcntl(fd, F_GETFL) & O_APPEND) == O_APPEND)
+                goto fallback_write;
+
             int in_fd = get_working_fd(hash_entry->path);
             if (in_fd < 0)
                 goto fallback_write;
 
-            off_t in_offset = hash_entry->offset;
-
             unsigned char in_buf[BLOCK_SIZE];
-            if ((libc_pread)(in_fd, in_buf, BLOCK_SIZE, in_offset) < BLOCK_SIZE)
+            if ((libc_pread)(in_fd, in_buf, BLOCK_SIZE, hash_entry->offset) <
+                BLOCK_SIZE)
                 goto fallback_write;
             if (memcmp(block_buf, in_buf, BLOCK_SIZE) != 0)
                 goto fallback_write;
 
-            if ((written = copy_file_range(in_fd, &in_offset, fd, &offset,
-                                           BLOCK_SIZE, 0)) < 0) {
+            if ((written = copy_file_range(in_fd, &hash_entry->offset, fd,
+                                           &offset, BLOCK_SIZE, 0)) < 0) {
                 goto fallback_write;
             }
             if (lseek(fd, written, SEEK_CUR) < 0) {
