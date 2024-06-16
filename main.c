@@ -52,29 +52,19 @@ void __attribute__((constructor)) libwritededuper_init(void) {
     libwritededuper_ready = 1;
 }
 
-enum Operation {
-    WRITE,
-    PWRITE,
-    READ,
-    PREAD,
-};
-
-ssize_t handle_fallback_write(enum Operation type, int fd, const void *buf,
-                              size_t count, off_t offset) {
-    if (type == WRITE) {
-        return (*libc_write)(fd, buf, count);
-    } else if (type == PWRITE) {
+ssize_t handle_fallback_write(int type, int fd, const void *buf, size_t count,
+                              off_t offset) {
+    if (type)
         return (*libc_pwrite)(fd, buf, count, offset);
-    }
-    return -1;
+    return (*libc_write)(fd, buf, count);
 }
 
-ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
-                     size_t count, off_t offset) {
+ssize_t handle_write(int type, int fd, const unsigned char *buf, size_t count,
+                     off_t offset) {
     if (count < BLOCK_SIZE)
         return handle_fallback_write(type, fd, buf, count, offset);
 
-    if (type == WRITE)
+    if (!type)
         if ((offset = lseek(fd, 0, SEEK_CUR)) < 0 || offset % BLOCK_SIZE != 0)
             return handle_fallback_write(type, fd, buf, count, offset);
 
@@ -148,22 +138,19 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
     return total_written;
 }
 
-ssize_t handle_fallback_read(enum Operation type, int fd, void *buf,
-                             size_t count, off_t offset) {
-    if (type == READ) {
-        return (*libc_read)(fd, buf, count);
-    } else if (type == PREAD) {
+ssize_t handle_fallback_read(int type, int fd, void *buf, size_t count,
+                             off_t offset) {
+    if (type)
         return (*libc_pread)(fd, buf, count, offset);
-    }
-    return -1;
+    return (*libc_read)(fd, buf, count);
 }
 
-ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
-                    size_t count, off_t offset) {
+ssize_t handle_read(int type, int fd, unsigned char *buf, size_t count,
+                    off_t offset) {
     if (count < BLOCK_SIZE)
         return handle_fallback_read(type, fd, buf, count, offset);
 
-    if (type == READ)
+    if (!type)
         if ((offset = lseek(fd, 0, SEEK_CUR)) < 0 || offset % BLOCK_SIZE != 0)
             return handle_fallback_read(type, fd, buf, count, offset);
 
@@ -205,26 +192,26 @@ ssize_t write(int fd, const void *buf, size_t count) {
     if (!libwritededuper_ready)
         libwritededuper_init();
 
-    return handle_write(WRITE, fd, buf, count, -1);
+    return handle_write(0, fd, buf, count, -1);
 }
 
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
     if (!libwritededuper_ready)
         libwritededuper_init();
 
-    return handle_write(PWRITE, fd, buf, count, offset);
+    return handle_write(1, fd, buf, count, offset);
 }
 
 ssize_t read(int fd, void *buf, size_t count) {
     if (!libwritededuper_ready)
         libwritededuper_init();
 
-    return handle_read(READ, fd, buf, count, -1);
+    return handle_read(0, fd, buf, count, -1);
 }
 
 ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
     if (!libwritededuper_ready)
         libwritededuper_init();
 
-    return handle_read(PREAD, fd, buf, count, offset);
+    return handle_read(1, fd, buf, count, offset);
 }
