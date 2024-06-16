@@ -18,6 +18,8 @@
 
 #define BLOCK_SIZE 4096
 
+static int libwritededuper_ready = 0;
+
 static int (*libc_write)(int fd, const void *buf, size_t count);
 static int (*libc_pwrite)(int fd, const void *buf, size_t count, off_t offset);
 static int (*libc_read)(int fd, void *buf, size_t count);
@@ -25,17 +27,12 @@ static int (*libc_pread)(int fd, void *buf, size_t count, off_t offset);
 
 #define RESOLVE_SYMBOL(name)                                                   \
     libc_##name = dlsym(RTLD_NEXT, #name);                                     \
-    if (!libc_##name || dlerror()) {                                           \
-        fprintf(stderr, "libwritededuper: undeclared symbol `" #name "`\n");   \
+    if (!libc_##name) {                                                        \
+        fprintf(stderr,                                                        \
+                "libwritededuper: undeclared symbol `" #name "`: %s\n",        \
+                dlerror());                                                    \
         exit(EXIT_FAILURE);                                                    \
     };
-
-enum Operation {
-    WRITE,
-    PWRITE,
-    READ,
-    PREAD,
-};
 
 void __attribute__((constructor)) libwritededuper_init(void) {
     if ((hash_table = malloc(sizeof(struct HashEntry *) * pow(2, 32))) ==
@@ -51,7 +48,16 @@ void __attribute__((constructor)) libwritededuper_init(void) {
     RESOLVE_SYMBOL(pwrite);
     RESOLVE_SYMBOL(read);
     RESOLVE_SYMBOL(pread);
+
+    libwritededuper_ready = 1;
 }
+
+enum Operation {
+    WRITE,
+    PWRITE,
+    READ,
+    PREAD,
+};
 
 ssize_t handle_fallback_write(enum Operation type, int fd, const void *buf,
                               size_t count, off_t offset) {
@@ -196,17 +202,29 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
 }
 
 ssize_t write(int fd, const void *buf, size_t count) {
+    if (!libwritededuper_ready)
+        libwritededuper_init();
+
     return handle_write(WRITE, fd, buf, count, -1);
 }
 
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset) {
+    if (!libwritededuper_ready)
+        libwritededuper_init();
+
     return handle_write(PWRITE, fd, buf, count, offset);
 }
 
 ssize_t read(int fd, void *buf, size_t count) {
+    if (!libwritededuper_ready)
+        libwritededuper_init();
+
     return handle_read(READ, fd, buf, count, -1);
 }
 
 ssize_t pread(int fd, void *buf, size_t count, off_t offset) {
+    if (!libwritededuper_ready)
+        libwritededuper_init();
+
     return handle_read(PREAD, fd, buf, count, offset);
 }
