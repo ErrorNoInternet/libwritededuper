@@ -114,7 +114,7 @@ ssize_t handle_write(int type, int fd, const unsigned char *buf, size_t count,
                 goto fallback_write;
 
             unsigned char in_buf[BLOCK_SIZE];
-            if ((libc_pread)(in_fd, in_buf, BLOCK_SIZE, hash_entry->offset) <
+            if ((*libc_pread)(in_fd, in_buf, BLOCK_SIZE, hash_entry->offset) <
                 BLOCK_SIZE)
                 goto fallback_write;
             if (memcmp(block_buf, in_buf, BLOCK_SIZE) != 0)
