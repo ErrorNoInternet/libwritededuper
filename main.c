@@ -69,7 +69,8 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
         return handle_fallback_write(type, fd, buf, count, offset);
 
     if (type == WRITE)
-        offset = lseek(fd, 0, SEEK_CUR);
+        if ((offset = lseek(fd, 0, SEEK_CUR)) < 0)
+            return handle_fallback_write(type, fd, buf, count, offset);
 
     if (count < BLOCK_SIZE || offset % BLOCK_SIZE != 0)
         return handle_fallback_write(type, fd, buf, count, offset);
@@ -154,7 +155,8 @@ ssize_t handle_fallback_read(enum Operation type, int fd, void *buf,
 ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
                     size_t count, off_t offset) {
     if (type == READ)
-        offset = lseek(fd, 0, SEEK_CUR);
+        if ((offset = lseek(fd, 0, SEEK_CUR)) < 0)
+            return handle_fallback_read(type, fd, buf, count, offset);
 
     if (count < BLOCK_SIZE || offset % BLOCK_SIZE != 0)
         return handle_fallback_read(type, fd, buf, count, offset);
