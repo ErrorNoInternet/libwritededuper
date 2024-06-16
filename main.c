@@ -97,7 +97,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
         if ((hash_entry = hash_table[hash]) == NULL) {
         fallback_write:
             hash_entry = malloc(sizeof(struct HashEntry));
-            strcpy(hash_entry->path, path);
+            strlcpy(hash_entry->path, path, 4096);
             hash_entry->offset = offset;
             hash_table[hash] = hash_entry;
 
@@ -181,7 +181,7 @@ ssize_t handle_read(enum Operation type, int fd, unsigned char *buf,
         uint32_t hash = calculate_crc32c(0, block_buf, BLOCK_SIZE);
 
         hash_entry = malloc(sizeof(struct HashEntry));
-        strcpy(hash_entry->path, path);
+        strlcpy(hash_entry->path, path, 4096);
         hash_entry->offset = offset;
         hash_table[hash] = hash_entry;
 
