@@ -128,7 +128,7 @@ ssize_t handle_write(enum Operation type, int fd, const unsigned char *buf,
                                            BLOCK_SIZE, 0)) < 0) {
                 goto fallback_write;
             }
-            if (lseek(fd, written, SEEK_CUR) == -1) {
+            if (lseek(fd, written, SEEK_CUR) < 0) {
                 fprintf(stderr,
                         "libwritededuper: couldn't lseek %ld bytes on file "
                         "descriptor %d: %m\n",
