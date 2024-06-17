@@ -1,11 +1,12 @@
-#include "fcntl.h"
-#include "hashmap.h"
 #include <dirent.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "hashmap.h"
 
 #define GC_TRIGGER 1000
 #define GC_MAX_AGE 1
