@@ -48,7 +48,7 @@ int get_working_fd(char *path) {
 
     if (!working_fd) {
         int fd;
-        if ((fd = open(path, O_RDWR)) < 0)
+        if ((fd = open(path, O_RDONLY)) < 0)
             return fd;
         struct WorkingFd *new_working_fd =
             &(struct WorkingFd){.path = path, .fd = fd, .atime = current_time};
