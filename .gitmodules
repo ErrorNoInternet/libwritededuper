@@ -1,3 +1,6 @@
 [submodule "hashmap"]
 	path = hashmap
 	url = https://github.com/tidwall/hashmap.c
+[submodule "hiredis"]
+	path = hiredis
+	url = https://github.com/redis/hiredis
