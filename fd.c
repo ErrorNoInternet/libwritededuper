@@ -6,7 +6,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "hashmap.h"
+#include "hashmap/hashmap.h"
 
 #define GC_TRIGGER 1000
 #define GC_MAX_AGE 1

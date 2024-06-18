@@ -13,7 +13,7 @@
 
 #include "crc32.c"
 #include "fd.c"
-#include "hashmap.c"
+#include "hashmap/hashmap.c"
 #include "hashtable.c"
 
 #define BLOCK_SIZE 4096
